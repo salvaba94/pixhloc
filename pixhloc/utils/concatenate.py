@@ -21,12 +21,15 @@ def concat_features(features1: Path, features2: Path, out_path: Path) -> None:
     img_list = list(set(img_list))
     ensemble_features = {}
 
+    print(features1, features2)
+
     with h5.File(features1, "r") as f1:
         with h5.File(features2, "r") as f2:
             for img in tqdm(img_list, desc="concatenating features", ncols=80):
                 kpts1 = f1[img]["keypoints"] if img in f1.keys() else np.array([])
                 kpts2 = f2[img]["keypoints"] if img in f2.keys() else np.array([])
 
+                print(f1[img], f2[img])
                 scores1 = f1[img]["scores"] if img in f1.keys() else np.array([])
                 scores2 = f2[img]["scores"] if img in f2.keys() else np.array([])
 

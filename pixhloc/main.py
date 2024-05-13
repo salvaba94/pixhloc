@@ -11,6 +11,7 @@ import pickle
 import shutil
 import time
 from pathlib import Path
+from copy import deepcopy
 
 import numpy as np
 from hloc import extract_features
@@ -165,9 +166,9 @@ def main(args):
 
         logging.info(f"Extracting results for {dataset} - {scene}")
         for _, im in sparse_model.images.items():
-            img_name = os.path.join(dataset, scene, "images", im.name)
+            img_name = os.path.join(args.mode, dataset, "images", im.name)
             # problem: tvec is a reference! --> force copy
-            out_results[dataset][scene][img_name] = {"R": im.rotmat(), "t": np.array(im.tvec)}
+            out_results[dataset][scene][img_name] = {"R": deepcopy(im.rotmat()), "t": deepcopy(np.array(im.tvec))}
 
         metrics[dataset][scene] = {
             "n_images": len(img_list),
@@ -211,7 +212,7 @@ def main(args):
                 )
 
         # EVALUATE
-        eval(submission_csv="submission.csv", data_dir=data_dir)
+        eval(submission_csv="submission.csv", data_dir=data_dir, verbose=True)
 
     logging.info(f"Done in {datetime.timedelta(seconds=time.time() - start)}")
 
@@ -247,7 +248,6 @@ if __name__ == "__main__":
         action="store_true",
         help="wrapper implementation of rotation matching",
     )
-    parser.add_argument("--rotation_weights", type=str, default="checkpoint.pth", help="path to rotation matching weights")
     parser.add_argument("--cropping", action="store_true", help="use image cropping")
     parser.add_argument(
         "--max_rel_crop_size",

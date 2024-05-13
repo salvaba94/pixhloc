@@ -1,7 +1,7 @@
 from hloc import match_features
 
 configs = {
-    "SIFT": {
+    "sift": {
         "features": {
             "model": {"name": "dog"},
             "options": {
@@ -9,7 +9,7 @@ configs = {
                 "peak_threshold": 0.00667,  # 0.00667, # 0.01,
             },
             "output": "feats-sift",
-            "preprocessing": {"grayscale": True, "resize_max": 1600},
+            "preprocessing": { "grayscale": False, "resize_max": 1600},
         },
         "matches": match_features.confs["NN-ratio"],
     },
@@ -18,12 +18,28 @@ configs = {
         "matches": {
             "output": "matches-loftr",
             "model": {"name": "loftr", "weights": "outdoor"},
-            "preprocessing": {"grayscale": True, "resize_max": 840, "dfactor": 8},  # 1024,
+            "preprocessing": { "grayscale": False, "resize_max": 840, "dfactor": 8 },  # 1024,
             "max_error": 1,  # max error for assigned keypoints (in px)
             "cell_size": 1,  # size of quantization patch (max 1 kp/patch)
         },
     },
-    "DISK": {
+    "xfeat": {
+        "features": {
+            "model": {"name": "xfeat" },
+            "preprocessing": { "grayscale": False, "resize_max": 1600 },
+            "output": "feats-xfeat",
+            "top_k": 4096,
+            "semi_dense": True
+        },
+        "matches": {
+            "model": {"name": "cosine_mlp" },
+            "preprocessing": { "grayscale": False, "resize_max": 1600 },
+            "output": "matches-cosine-mlp",
+            "top_k": 4096,
+            "semi_dense": True
+        },
+    },
+    "disk": {
         "features": {
             "output": "feats-disk",
             "model": {
@@ -38,18 +54,17 @@ configs = {
         "matches": {
             "output": "matches-disk-lightglue",
             "model": {
+                "features": "disk",
                 "name": "lightglue",
-                "weights": "disk_lightglue_legacy",
-                "input_dim": 128,
-                "flash": True,
+                "weights": "disk_lightglue",
                 "filter_threshold": 0.1,
-                "rotary": {
-                    "axial": True,
-                },
+                "width_confidence": -1,
+                "depth_confidence": -1,
+                "mp": True
             },
         },
     },
-    "DISKh": {
+    "diskh": {
         "features": {
             "output": "feats-disk",
             "model": {
@@ -64,18 +79,17 @@ configs = {
         "matches": {
             "output": "matches-disk-lightglue",
             "model": {
+                "features": "disk",
                 "name": "lightglue",
-                "weights": "disk_lightglue_legacy",
-                "input_dim": 128,
-                "flash": True,
+                "weights": "disk_lightglue",
                 "filter_threshold": 0.2,
-                "rotary": {
-                    "axial": True,
-                },
+                "width_confidence": -1,
+                "depth_confidence": -1,
+                "mp": True
             },
         },
     },
-    "DISKl": {
+    "diskl": {
         "features": {
             "output": "feats-disk",
             "model": {
@@ -90,18 +104,16 @@ configs = {
         "matches": {
             "output": "matches-disk-lightglue",
             "model": {
+                "features": "disk",
                 "name": "lightglue",
-                "weights": "disk_lightglue_legacy",
-                "input_dim": 128,
-                "flash": True,
                 "filter_threshold": 0.01,
-                "rotary": {
-                    "axial": True,
-                },
+                "width_confidence": -1,
+                "depth_confidence": -1,
+                "mp": True
             },
         },
     },
-    "DISK2K": {
+    "disk2k": {
         "features": {
             "output": "feats-disk2k",
             "model": {
@@ -116,18 +128,16 @@ configs = {
         "matches": {
             "output": "matches-disk2k-lightglue",
             "model": {
+                "features": "disk",
                 "name": "lightglue",
-                "weights": "disk_lightglue_legacy",
-                "input_dim": 128,
-                "flash": True,
                 "filter_threshold": 0.1,
-                "rotary": {
-                    "axial": True,
-                },
+                "width_confidence": -1,
+                "depth_confidence": -1,
+                "mp": True
             },
         },
     },
-    "ALIKED": {
+    "aliked": {
         "features": {
             "output": "feats-alikedn16",
             "model": {
@@ -145,15 +155,16 @@ configs = {
         "matches": {
             "output": "matches-aliked-lightglue",
             "model": {
+                "features": "aliked",
                 "name": "lightglue",
-                "weights": "aliked_lightglue",
-                "input_dim": 128,
-                "flash": True,
                 "filter_threshold": 0.1,
+                "width_confidence": -1,
+                "depth_confidence": -1,
+                "mp": True
             },
         },
     },
-    "ALIKED2K": {
+    "aliked2k": {
         "features": {
             "output": "feats-aliked2k",
             "model": {
@@ -171,15 +182,16 @@ configs = {
         "matches": {
             "output": "matches-aliked2k-lightglue",
             "model": {
+                "features": "aliked",
                 "name": "lightglue",
-                "weights": "aliked_lightglue",
-                "input_dim": 128,
-                "flash": True,
                 "filter_threshold": 0.1,
+                "width_confidence": -1,
+                "depth_confidence": -1,
+                "mp": True
             },
         },
     },
-    "ALIKED2Kh": {
+    "aliked2kh": {
         "features": {
             "output": "feats-aliked2k",
             "model": {
@@ -197,15 +209,16 @@ configs = {
         "matches": {
             "output": "matches-aliked2k-lightglue",
             "model": {
+                "features": "aliked",
                 "name": "lightglue",
-                "weights": "aliked_lightglue",
-                "input_dim": 128,
-                "flash": True,
                 "filter_threshold": 0.2,
+                "width_confidence": -1,
+                "depth_confidence": -1,
+                "mp": True
             },
         },
     },
-    "ALIKED2Kl": {
+    "aliked2kl": {
         "features": {
             "output": "feats-aliked2k",
             "model": {
@@ -223,12 +236,13 @@ configs = {
         "matches": {
             "output": "matches-aliked2k-lightglue",
             "model": {
+                "features": "aliked",
                 "name": "lightglue",
-                "weights": "aliked_lightglue",
-                "input_dim": 128,
-                "flash": True,
                 "filter_threshold": 0.01,
-            },
-        },
-    },
+                "width_confidence": -1,
+                "depth_confidence": -1,
+                "mp": True
+            }
+        }
+    }
 }

@@ -2,11 +2,12 @@ import argparse
 import logging
 from dataclasses import dataclass
 from time import time
+from pathlib import Path
 
 import numpy as np
 
 # Eval train submission
-# https://www.kaggle.com/code/eduardtrulls/imc2023-evaluation
+# https://www.kaggle.com/code/eduardtrulls/pixhloc-evaluation
 
 
 # Conveniency functions.
@@ -126,14 +127,22 @@ def eval_submission(
     gt_dict = dict_from_csv(ground_truth_csv_path, has_header=True)
 
     # Check that all necessary keys exist in the submission file
+    gt_new = {}
     for dataset in gt_dict:
+        gt_new[dataset] = {}
         assert dataset in submission_dict, f"Unknown dataset: {dataset}"
         for scene in gt_dict[dataset]:
+            gt_new[dataset][scene] = {}
             assert scene in submission_dict[dataset], f"Unknown scene: {dataset}->{scene}"
             for image in gt_dict[dataset][scene]:
-                assert (
-                    image in submission_dict[dataset][scene]
-                ), f"Unknown image: {dataset}->{scene}->{image}"
+                if image not in submission_dict[dataset][scene]:
+                    logging.info(
+                        f"Unknown image: {dataset}->{scene}->{image}"
+                    )
+                else:
+                    gt_new[dataset][scene][image] = gt_dict[dataset][scene][image]
+
+    gt_dict = gt_new
 
     # Iterate over all the scenes
     if verbose:
@@ -180,7 +189,7 @@ def eval_submission(
                     + f"mAA_q={np.mean(mAA_q):.06f}, "
                     + f"mAA_t={np.mean(mAA_t):.06f}"
                 )
-            metrics_per_scene.append(np.mean(mAA))
+            metrics_per_scene.append(np.mean(mAA_t)) # This competition only accounts for translation
             all_metrics[dataset][scene]["mAA"] = float(np.mean(mAA))
             all_metrics[dataset][scene]["mAA_q"] = float(np.mean(mAA_q))
             all_metrics[dataset][scene]["mAA_t"] = float(np.mean(mAA_t))
@@ -189,11 +198,11 @@ def eval_submission(
         all_metrics[dataset]["mAA"] = float(np.mean(metrics_per_scene))
 
         if verbose:
-            logging.info(f"{dataset} -> mAA={np.mean(metrics_per_scene):.06f}")
+            logging.info(f"{dataset} -> mAA_t={np.mean(metrics_per_scene):.06f}")
 
     if verbose:
         logging.info(
-            f"Final metric -> mAA={np.mean(metrics_per_dataset):.06f} (t: {time() - t} sec.)"
+            f"Final metric -> mAA_t={np.mean(metrics_per_dataset):.06f} (t: {time() - t} sec.)"
         )
 
     all_metrics["mAA"] = float(np.mean(metrics_per_dataset))
@@ -219,30 +228,36 @@ def eval(
     """
     # Set rotation thresholds per scene.
     rotation_thresholds_degrees_dict = {
-        **{("haiper", scene): np.linspace(1, 10, 10) for scene in ["bike", "chairs", "fountain"]},
-        **{("heritage", scene): np.linspace(1, 10, 10) for scene in ["cyprus", "dioscuri"]},
-        **{("heritage", "wall"): np.linspace(0.2, 10, 10)},
-        **{("urban", "kyiv-puppet-theater"): np.linspace(1, 10, 10)},
+        ('multi-temporal-temple-baalshamin', 'multi-temporal-temple-baalshamin'): np.linspace(1, 10, 6),
+        ('pond', 'pond'):                                                         np.linspace(1, 10, 6),
+        ('transp_obj_glass_cylinder', 'transp_obj_glass_cylinder'):               np.linspace(1, 10, 6),
+        ('transp_obj_glass_cup', 'transp_obj_glass_cup'):                         np.linspace(1, 10, 6),
+        ('church', 'church'):                                                     np.linspace(1, 10, 6),
+        ('lizard', 'lizard'):                                                     np.linspace(1, 10, 6),
+        ('dioscuri', 'dioscuri'):                                                 np.linspace(1, 10, 6), 
     }
+    
 
     translation_thresholds_meters_dict = {
-        **{
-            ("haiper", scene): np.geomspace(0.05, 0.5, 10)
-            for scene in ["bike", "chairs", "fountain"]
-        },
-        **{("heritage", scene): np.geomspace(0.1, 2, 10) for scene in ["cyprus", "dioscuri"]},
-        **{("heritage", "wall"): np.geomspace(0.05, 1, 10)},
-        **{("urban", "kyiv-puppet-theater"): np.geomspace(0.5, 5, 10)},
+        ('multi-temporal-temple-baalshamin', 'multi-temporal-temple-baalshamin'): np.array([0.025,  0.05,  0.1,  0.2,  0.5,  1.0]),
+        ('pond', 'pond'):                                                         np.array([0.025,  0.05,  0.1,  0.2,  0.5,  1.0]),
+        ('transp_obj_glass_cylinder', 'transp_obj_glass_cylinder'):               np.array([0.0025, 0.005, 0.01, 0.02, 0.05, 0.1]),
+        ('transp_obj_glass_cup', 'transp_obj_glass_cup'):                         np.array([0.0025, 0.005, 0.01, 0.02, 0.05, 0.1]),
+        ('church', 'church'):                                                     np.array([0.025,  0.05,  0.1,  0.2,  0.5,  1.0]),
+        ('lizard', 'lizard'):                                                     np.array([0.025,  0.05,  0.1,  0.2,  0.5,  1.0]),
+        ('dioscuri', 'dioscuri'):                                                 np.array([0.025,  0.05,  0.1,  0.2,  0.5,  1.0]), 
     }
 
-    # Generate GT.
-    with open(f"{data_dir}/train/train_labels.csv", "r") as fr, open("ground_truth.csv", "w") as fw:
-        for i, l in enumerate(fr):
-            if i == 0:
-                fw.write("image_path,dataset,scene,rotation_matrix,translation_vector\n")
-            else:
-                dataset, scene, image, R, T = l.strip().split(",")
-                fw.write(f"{image},{dataset},{scene},{R},{T}\n")
+    import pandas as pd
+
+    train_df = pd.read_csv(f'{data_dir}/train/train_labels.csv')
+    train_df["image_name"] = train_df["image_name"].str.replace("'","_")
+    train_df["image_name"] = train_df["image_name"].str.replace(".12.50","") # This is to fix a typo in data
+    
+    train_df["image_path"] = "train" + "/" + train_df["dataset"] + "/images/" + train_df["image_name"]
+
+    pred_df = train_df[['image_path','dataset','scene','rotation_matrix','translation_vector']]
+    pred_df.to_csv('ground_truth.csv',index=False)
 
     return eval_submission(
         submission_csv_path=submission_csv,

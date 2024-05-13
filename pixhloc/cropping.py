@@ -56,12 +56,12 @@ def crop_images(
 
     # extract and match features using SIFT and NN-ratio
     extract_features.main(
-        conf=configs["SIFT"]["features"],
+        conf=configs["sift"]["features"],
         image_dir=paths.image_dir,
         feature_path=paths.cropping_features_path,
     )
     match_features.main(
-        conf=configs["SIFT"]["matches"],
+        conf=configs["sift"]["matches"],
         pairs=paths.cropping_pairs_path,
         features=paths.cropping_features_path,
         matches=paths.cropping_matches_path,

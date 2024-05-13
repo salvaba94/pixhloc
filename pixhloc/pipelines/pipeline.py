@@ -403,9 +403,11 @@ class Pipeline:
                 logging.warning("Could not reconstruct model with PixSfM.")
                 self.sparse_model = None
         else:
-            mapper_options = pycolmap.IncrementalMapperOptions()
-            mapper_options.min_model_size = 6
-            mapper_options.min_num_matches = 10
+            mapper_options = {
+                **pycolmap.IncrementalMapperOptions().todict(),
+                "min_model_size": 6,
+                "min_num_matches": 10
+            }
 
             self.sparse_model = reconstruction.main(
                 sfm_dir=self.paths.sfm_dir,
@@ -416,8 +418,8 @@ class Pipeline:
                 matches=self.paths.matches_path,
                 camera_mode=camera_mode,
                 verbose=False,
-                reference_model=self.paths.reference_model,
-                mapper_options=mapper_options.todict(),
+                #reference_model=self.paths.reference_model,
+                mapper_options=mapper_options,
                 # skip_geometric_verification=True,
             )
 

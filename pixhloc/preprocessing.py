@@ -5,6 +5,8 @@ import torch
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 from torchvision import transforms
+from torchvision.datasets.utils import download_url
+import re
 
 import cv2
 import torch
@@ -16,41 +18,47 @@ from tqdm import tqdm
 
 class OrientationPredictor(nn.Module):
 
-    def __init__(self, rotation_weights, device="auto", dtype="float16"):
+    def __init__(self, device="auto"):
 
-        import timm
-        from iglovikov_helper_functions.config_parsing.utils import object_from_dict
-        from iglovikov_helper_functions.dl.pytorch.utils import state_dict_from_disk
+        super().__init__()
 
+        from timm import create_model as timm_create_model
+        from torch.utils import model_zoo
 
-        model = {
-            "type": timm.create_model,
-            "model_name": "swsl_resnext50_32x4d",
-            "num_classes": 4,
-            "pretrained": True
-        }
+        def rename_layers(state_dict: Dict[str, Any], rename_in_layers: Dict[str, Any]) -> Dict[str, Any]:
+            result = {}
+            for key, value in state_dict.items():
+                for key_r, value_r in rename_in_layers.items():
+                    key = re.sub(key_r, value_r, key)
+                result[key] = value
+            return result
 
-        if device == "auto":
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-
-        self.model = object_from_dict(model)
-        corrections: Dict[str, str] = {"model.": ""}
-        state_dict = state_dict_from_disk(file_path=rotation_weights, rename_in_layers=corrections)
+        self.model = timm_create_model("swsl_resnext50_32x4d", pretrained=False, num_classes=4)
+        state_dict = model_zoo.load_url(
+            "https://github.com/ternaus/check_orientation/releases/download/v0.0.3/2020-11-16_resnext50_32x4d.zip", 
+            progress=True, 
+            map_location="cpu"
+        )["state_dict"]
+        state_dict = rename_layers(state_dict, {"model.": ""})
         self.model.load_state_dict(state_dict)
 
-        self.model = torch.nn.Sequential(self.model, torch.nn.Softmax(dim=1))
-        self.model = self.model.eval().to(device=device).to(dtype=dtype)
+        self.device = device
+        if self.device == "auto":
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        self.transforms = transforms.Compose(
+        self.model = torch.nn.Sequential(self.model, torch.nn.Softmax(dim=1))
+        self.model = self.model.eval().to(device=self.device)
+
+        self.transforms = transforms.Compose((
             transforms.ToTensor(),
             transforms.Resize(size=(224, 224)),
-            transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-        )
+            transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+        ))
 
-        self.angles = np.array([0, 90, 180, 270])
+        self.angles = torch.as_tensor([0, 90, 180, 270], device=self.device)
 
+    @torch.no_grad()
     def forward(self, image):
-        image = self.transforms(image)
         logits = self.model(image)
         result = self.angles[torch.argmax(logits, dim=-1)]
         return result, logits
@@ -149,17 +157,20 @@ def preprocess_image_dir(
         logging.debug(f"Rotating {output_dir / 'images'}")
         logging.debug(f"Saving to {output_dir / 'images_rotated'}")
 
-        deep_orientation = OrientationPredictor(args.rotation_weights)
-
+        deep_orientation = OrientationPredictor()
 
         for image_fn in tqdm(image_list, desc=f"Rotating {input_dir.name}", ncols=80):
             img_path = output_dir / "images" / image_fn
 
             image = cv2.imread(str(img_path))
-            angle, _ = deep_orientation(image)
+            image = deep_orientation.transforms(image)
+            image = image.to(device=deep_orientation.device).unsqueeze(0)
+            with torch.amp.autocast(device_type="cuda", dtype=torch.float16):
+                angle, _ = deep_orientation(image)
+                angle = angle.squeeze(0).cpu().numpy()
 
             image = cv2.imread(str(img_path))
-            image, angle = get_rotated_image(image, angle)
+            image, angle = get_rotated_image(image, int(angle))
 
             if prev_shape is not None:
                 same_rotated_shapes &= prev_shape == image.shape

@@ -108,9 +108,6 @@ def get_data_from_dir(data_dir: str, mode: str) -> Dict[str, Any]:
         if os.path.isdir(os.path.join(data_dir, mode, x))
     ]
     for dataset in datasets:
-        # SKIP PHOTOTOURISM FOR TRAINING
-        if mode == "train" and dataset == "phototourism":
-            continue
         if dataset not in data_dict:
             data_dict[dataset] = {}
 
@@ -118,7 +115,7 @@ def get_data_from_dir(data_dir: str, mode: str) -> Dict[str, Any]:
         scene = dataset
         data_dict[dataset][scene] = []
         for img in os.listdir(image_dir):
-            data_dict[dataset][scene].append(os.path.join(dataset, "images", img))
+            data_dict[dataset][scene].append(os.path.join(mode, dataset, "images", img))
 
     log_data_dict(data_dict)
     return data_dict
