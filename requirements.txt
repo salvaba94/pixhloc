@@ -1,3 +1,11 @@
-pytorch_lighning
+hloc
+pyceres
+pycolmap
+pixsfm
+einops
+omegaconf
+prettytable
+pytorch_lightning
 pytorch_metric_learning
 faiss_gpu
+xformers

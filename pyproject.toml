@@ -1,0 +1,43 @@
+[build-system]
+requires = [
+  "setuptools",
+  "wheel"
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pixhloc"
+version = "1.0.0"
+description = "Sfm pipelines for IMC 2024 challenge."
+readme = { file = "README.md" , content-type = "text/markdown" }
+
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+keywords = [
+    "deep-learning",
+    "pytorch",
+    "vision",
+    "sfm",
+    "colmap",
+    "localization"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence"
+]
+
+dynamic = ["dependencies"]
+
+[project.urls]
+repository = "https://github.com/salvaba94/pixhloc"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pixhloc*"]

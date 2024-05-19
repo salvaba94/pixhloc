@@ -148,9 +148,42 @@ def create_submission(out_results: Dict[str, Any], data_dict: Dict[str, Any], fn
                         R = np.eye(3).reshape(-1)
                         T = np.zeros((3))
                     f.write(f"{image},{dataset},{scene},{arr_to_str(R)},{arr_to_str(T)}\n")
-    f.close()
 
     logging.info(f"Written {n_images_written} of {n_images_total} images to submission file.")
+
+
+def create_submission_mod(out_results: Dict[str, Any], data_dict: Dict[str, Any], fname: str, data_dir: str):
+
+    import pandas as pd
+    df = pd.read_csv(Path(data_dir).joinpath("sample_submission.csv"))
+    with open(fname, 'w') as f:
+        f.write('image_path,dataset,scene,rotation_matrix,translation_vector\n')
+        for dataset in data_dict:
+            if dataset in out_results:
+                res = out_results[dataset]
+            else:
+                res = {}
+            for scene in data_dict[dataset]:
+                if scene in res:
+                    scene_res = res[scene]
+                else:
+                    scene_res = {"R":{}, "t":{}}
+                for image in data_dict[dataset][scene]:
+                    prev_image = image
+                    #image = image.split('/')[-1]
+                    if image in scene_res:
+                        R = scene_res[image]['R'].reshape(-1)
+                        T = scene_res[image]['t'].reshape(-1)
+                    else:
+                        R = np.eye(3).reshape(-1)
+                        T = np.zeros((3))
+                    if(image not in df['image_path'].tolist()):
+                        f.write(f'{prev_image},{dataset},{scene},{arr_to_str(R)},{arr_to_str(T)}\n')
+                    else:
+                        f.write(f'{image},{dataset},{scene},{arr_to_str(R)},{arr_to_str(T)}\n')
+
+
+
 
 
 class DataPaths:

@@ -144,6 +144,30 @@ def preprocess_image_dir(
 
         cv2.imwrite(str(output_dir / "images" / image_fn), image)
 
+    same_shape =  same_original_shapes
+
+    logging.info(f"Images have same shapes: {same_shape}.")
+
+    return same_shape
+
+
+
+def rotate_image_dir(
+    input_dir: Path, output_dir: Path, image_list: List[str], same_original_shapes, args: argparse.Namespace
+) -> Tuple[Dict[str, Any], bool]:
+    """Preprocess images in input_dir and save them to output_dir.
+
+    Args:
+        input_dir (Path): Directory containing the a folder "images" with the images to preprocess.
+        output_dir (Path): Directory to save the preprocessed images to.
+        image_list (List[str]): List of image file names.
+        args (argparse.Namespace): Arguments.
+
+    Returns:
+        Tuple[Dict[str, Any], bool]: Dictionary mapping image file names to rotation angles and
+            whether all images have the same shape.
+    """
+
     # rotate image
     rotation_angles = {}
     n_rotated = 0

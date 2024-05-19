@@ -1,11 +1,5 @@
 import sys
 
-# for Euler
-sys.path.append("ext_deps/Hierarchical-Localization")
-
-# for Kaggle
-sys.path.append("/kaggle/input/imc-23-repo/IMC-2023/ext_deps/Hierarchical-Localization")
-
 import argparse
 import logging
 from pathlib import Path
@@ -48,6 +42,7 @@ conf = OmegaConf.load(args.pixsfm_config)
 # conf.mapping.BA.optimizer.refine_extrinsics = True
 
 
+
 refiner = PixSfM(conf=conf)
 sparse_model, _ = refiner.run(
     output_dir=Path(args.sfm_dir),
@@ -57,7 +52,7 @@ sparse_model, _ = refiner.run(
     matches_path=Path(args.matches_path),
     cache_path=Path(args.cache_path),
     verbose=False,
-    camera_mode=args.camera_mode,
+    camera_mode=pycolmap.CameraMode.AUTO if args.camera_mode == "auto" else pycolmap.CameraMode.SINGLE,
 )
 
 if sparse_model is not None:

@@ -34,6 +34,8 @@ def crop_images(
     img_list: List[str],
     min_rel_crop_size: float,
     max_rel_crop_size: float,
+    retrieval: str = None,
+    n_matches: int = 1,
 ) -> List[str]:
     """Crop image and add them to the image directory. Return updated image list.
 
@@ -44,24 +46,24 @@ def crop_images(
     """
     # get top 10 netvlad pairs
     extract_features.main(
-        conf=extract_features.confs["netvlad"],
+        conf=extract_features.confs["netvlad"] if retrieval is None else retrieval,
         image_dir=paths.image_dir,
         feature_path=paths.cropping_features_retrieval,
     )
     pairs_from_retrieval.main(
         descriptors=paths.cropping_features_retrieval,
-        num_matched=10,
+        num_matched=n_matches,
         output=paths.cropping_pairs_path,
     )
 
     # extract and match features using SIFT and NN-ratio
     extract_features.main(
-        conf=configs["sift"]["features"],
+        conf=configs["aliked2krot"]["features"],
         image_dir=paths.image_dir,
         feature_path=paths.cropping_features_path,
     )
     match_features.main(
-        conf=configs["sift"]["matches"],
+        conf=configs["aliked2krot"]["matches"],
         pairs=paths.cropping_pairs_path,
         features=paths.cropping_features_path,
         matches=paths.cropping_matches_path,
