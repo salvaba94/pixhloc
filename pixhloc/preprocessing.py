@@ -5,7 +5,8 @@ import torch
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 from torchvision import transforms
-from torchvision.datasets.utils import download_url
+from kornia.enhance import equalize_clahe, equalize
+from torchvision.transforms.functional import to_tensor, rgb_to_grayscale
 import re
 
 import cv2
@@ -64,6 +65,15 @@ class OrientationPredictor(nn.Module):
         return result, logits
 
 
+def equalize_image(image, grayscale=True, clip_limit=40., grid_size=20):
+    image = to_tensor(np.ascontiguousarray(image[..., ::-1]))
+    if grayscale:
+        image = rgb_to_grayscale(image, num_output_channels=3)
+    #image = equalize(image)
+    image = equalize_clahe(image, clip_limit=clip_limit, grid_size=(grid_size, grid_size))
+    image = image.squeeze(0).permute(1, 2, 0).numpy()[..., ::-1] * 255
+    return image
+
 
 def resize_image(image: np.ndarray, max_size: int) -> np.ndarray:
     """Resize image to max_size.
@@ -108,7 +118,7 @@ def get_rotated_image(image: np.ndarray, angle: float) -> Tuple[np.ndarray, floa
 
 
 def preprocess_image_dir(
-    input_dir: Path, output_dir: Path, image_list: List[str], args: argparse.Namespace
+    input_dir: Path, output_dir: Path, image_list: List[str], dataset: str, args: argparse.Namespace
 ) -> Tuple[Dict[str, Any], bool]:
     """Preprocess images in input_dir and save them to output_dir.
 
@@ -127,6 +137,10 @@ def preprocess_image_dir(
 
     # log paths to debug
     logging.debug(f"Rescaling {input_dir / 'images'}")
+
+    if "transp" in dataset:
+        logging.debug(f"Equalizing {input_dir / 'images'}")
+
     logging.debug(f"Saving to {output_dir / 'images'}")
 
     for image_fn in tqdm(image_list, desc=f"Rescaling {input_dir.name}", ncols=80):
@@ -141,6 +155,9 @@ def preprocess_image_dir(
         # resize image
         if args.resize is not None:
             image = resize_image(image, args.resize)
+
+        if "transp" in dataset:
+            image = equalize_image(image, args.equalize_grayscale, args.equalize_clip_limit, args.equalize_grid_size)
 
         cv2.imwrite(str(output_dir / "images" / image_fn), image)
 

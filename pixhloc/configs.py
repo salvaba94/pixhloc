@@ -1,7 +1,7 @@
 from hloc import match_features
 
 configs = {
-    "sift": {
+    "sift_nn": {
         "features": {
             "model": {"name": "dog"},
             "options": {
@@ -12,6 +12,30 @@ configs = {
             "preprocessing": { "grayscale": True, "resize_max": 1600},
         },
         "matches": match_features.confs["NN-ratio"],
+    },
+    "sift": {
+        "features": {
+            "model": {"name": "sift"},
+            "options": {
+                "first_octave": -1,
+                "peak_threshold": 0.00667,  # 0.00667, # 0.01,
+                "backend": "pycolmap"
+            },
+            "output": "feats-sift",
+            "preprocessing": { "grayscale": True, "resize_max": 1600},
+        },
+        "matches": {
+            "output": "matches-sift-lightglue",
+            "model": {
+                "features": "sift",
+                "name": "lightglue",
+                "weights": "sift_lightglue",
+                "filter_threshold": 0.1,
+                "width_confidence": -1,
+                "depth_confidence": -1,
+                "mp": True
+            },
+        },
     },
     "loftr": {
         "features": None,
@@ -29,22 +53,15 @@ configs = {
             "preprocessing": { "grayscale": False, "resize_max": 1600 },
             "output": "feats-xfeat",
             "top_k": 4096,
-            "semi_dense": True
         },
-        "matches": {
-            "model": {"name": "cosine_mlp" },
-            "preprocessing": { "grayscale": False, "resize_max": 1600 },
-            "output": "matches-cosine-mlp",
-            "top_k": 4096,
-            "semi_dense": True
-        },
+        "matches": match_features.confs["NN-mutual"],
     },
     "disk": {
         "features": {
             "output": "feats-disk",
             "model": {
                 "name": "disk",
-                "max_keypoints": 5000,
+                "max_keypoints": 4096,
             },
             "preprocessing": {
                 "grayscale": False,

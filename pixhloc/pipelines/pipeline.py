@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import time
 from abc import abstractmethod
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -65,9 +66,9 @@ class Pipeline:
             # use_rotation_matching (bool, optional): Whether to use rotation matching. Defaults to False.
             overwrite (bool, optional): Whether to overwrite previous output files. Defaults to False.
         """
-        self.config = config
-        self.paths = paths
-        self.img_list = img_list
+        self.config = deepcopy(config)
+        self.paths = deepcopy(paths)
+        self.img_list = deepcopy(img_list)
         self.use_pixsfm = args.pixsfm
         self.pixsfm_max_imgs = args.pixsfm_max_imgs
         self.pixsfm_config = args.pixsfm_config
@@ -77,8 +78,20 @@ class Pipeline:
         self.max_rel_crop_size = args.max_rel_crop_size
         self.min_rel_crop_size = args.min_rel_crop_size
         self.overwrite = args.overwrite
+        self.pixsfm_script_path = args.pixsfm_script_path
+        self.hloc_script_path = args.hloc_script_path
         self.same_shapes = False
-        self.args = args
+        self.args = deepcopy(args)
+
+        rot_condition = False
+        if self.args.equalize_transp:
+            rot_condition = "transp" in self.paths.dataset
+
+        if rot_condition:
+            self.use_rotation_matching = False
+            self.use_rotation_wrapper = False
+            self.args.rotation_matching = False
+            self.args.rotation_wrapper = False
 
         self.sparse_model = None
         self.rotated_sparse_model = None
@@ -127,6 +140,7 @@ class Pipeline:
             input_dir=self.paths.input_dir,
             output_dir=self.paths.scene_dir,
             image_list=self.img_list,
+            dataset=self.paths.dataset if self.args.equalize_transp else "",
             args=self.args,
         )
 
@@ -163,7 +177,11 @@ class Pipeline:
         """Get pairs of images to match."""
         self.log_step("Get pairs")
 
-        if len(self.img_list) < self.config["n_retrieval"]:
+        condition = "transp" in self.paths.dataset
+
+        n_retrieval = self.config["n_retrieval_transp"] if condition else self.config["n_retrieval"]
+
+        if len(self.img_list) < n_retrieval:
             pairs_from_exhaustive.main(output=self.paths.pairs_path, image_list=self.img_list)
             return
 
@@ -185,7 +203,7 @@ class Pipeline:
 
         pairs_from_retrieval.main(
             descriptors=self.paths.features_retrieval,
-            num_matched=self.config["n_retrieval"],
+            num_matched=n_retrieval,
             output=self.paths.pairs_path,
         )
 
@@ -326,6 +344,10 @@ class Pipeline:
 
         import pycolmap
 
+        arr = np.ones((10, 2))
+        pycolmap.fundamental_matrix_estimation(arr, arr)
+        #pycolmap.set_random_seed(self.args.seed)
+
         if self.paths.sfm_dir.exists() and not self.overwrite:
             try:
                 self.sparse_model = pycolmap.Reconstruction(self.paths.sfm_dir)
@@ -346,10 +368,11 @@ class Pipeline:
         self.pixsfm = (
             self.use_pixsfm
             and len(self.img_list) <= self.pixsfm_max_imgs
-            and (self.n_rotated == 0 or self.args.rotation_wrapper)
+            and (self.n_rotated == 0 or self.use_rotation_wrapper)
+            and ("transp" not in self.paths.dataset) # Does not get on well with transparent datasets
         ) or self.args.pixsfm_force
 
-        if self.n_rotated != 0 and self.use_pixsfm and not self.args.rotation_wrapper:
+        if self.n_rotated != 0 and self.use_pixsfm and not self.use_rotation_wrapper:
             logging.info(f"Not using pixsfm because {self.n_rotated} rotated images are detected")
 
         logging.info(f"Using images from {image_dir}")
@@ -360,78 +383,101 @@ class Pipeline:
 
         gc.collect()
         if self.pixsfm:
-            from omegaconf import OmegaConf
-            from pixsfm.refine_hloc import PixSfM
-
             logging.info("Using PixSfM")
 
             if not self.paths.cache.exists():
                 self.paths.cache.mkdir(parents=True)
 
-            pixsfm_config_name = (
-                Path(self.args.pixsfm_config).parent / "low_memory.yaml"
-                if len(self.img_list) > self.args.pixsfm_low_mem_threshold
-                else self.args.pixsfm_config
-            )
+            pixsfm_config_name = self.args.pixsfm_config
 
             logging.info(f"Using PixSfM config {pixsfm_config_name}")
-            logging.info(f"Running pixsfm in current process...")
 
-
-            conf = OmegaConf.load(pixsfm_config_name)
-
-            # conf.mapping.BA.optimizer.refine_extrinsics = True
-
-            refiner = PixSfM(conf=conf)
-            sparse_model, _ = refiner.run(
-                output_dir=Path(self.paths.sfm_dir),
-                image_dir=Path(image_dir),
-                pairs_path=Path(self.paths.pairs_path),
-                features_path=Path(self.paths.features_path),
-                matches_path=Path(self.paths.matches_path),
-                cache_path=Path(self.paths.cache),
-                verbose=False,
-                camera_mode=camera_mode,
+            proc = subprocess.Popen(
+                [
+                    "python",
+                    self.pixsfm_script_path,
+                    "--sfm_dir",
+                    str(self.paths.sfm_dir),
+                    "--image_dir",
+                    str(image_dir),
+                    "--pairs_path",
+                    str(self.paths.pairs_path),
+                    "--features_path",
+                    str(self.paths.features_path),
+                    "--matches_path",
+                    str(self.paths.matches_path),
+                    "--cache_path",
+                    str(self.paths.cache),
+                    "--pixsfm_config",
+                    str(pixsfm_config_name),
+                    "--camera_mode",
+                    "auto" if camera_mode == pycolmap.CameraMode.AUTO else "single",
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
             )
+            try:
+                logging.info(
+                    "Running PixSfM in subprocess (no console output until PixSfM finishes)"
+                )
+                output, error = proc.communicate()
+                logging.info(output.decode())
+                logging.error(error.decode())
 
-            if sparse_model is not None:
-                sparse_model.write(Path(self.paths.sfm_dir))
-
-            # clear cache
-            for file in Path(self.paths.cache).glob("*"):
-                file.unlink()
-
-            # subprocess writes sfm model to disk => load model in main process
-            if self.paths.sfm_dir.exists():
-                try:
-                    self.sparse_model = pycolmap.Reconstruction(self.paths.sfm_dir)
-                except ValueError:
-                    logging.warning(
-                        f"Could not reconstruct / read model from {self.paths.sfm_dir}."
-                    )
-                    self.sparse_model = None
+                # subprocess writes sfm model to disk => load model in main process
+                if self.paths.sfm_dir.exists():
+                    try:
+                        self.sparse_model = pycolmap.Reconstruction(self.paths.sfm_dir)
+                    except ValueError:
+                        logging.warning(
+                            f"Could not reconstruct / read model from {self.paths.sfm_dir}."
+                        )
+                        self.sparse_model = None
+            except Exception:
+                logging.warning("Could not reconstruct model with PixSfM.")
+                self.sparse_model = None
 
         else:
-            mapper_options = pycolmap.IncrementalMapperOptions()
-            mapper_options.min_model_size = 3
-            mapper_options.min_num_matches = 10
-
-            self.sparse_model = reconstruction.main(
-                sfm_dir=self.paths.sfm_dir,
-                image_dir=image_dir,
-                image_list=self.img_list,
-                pairs=self.paths.pairs_path,
-                features=self.paths.features_path,
-                matches=self.paths.matches_path,
-                camera_mode=camera_mode,
-                verbose=False,
-                #reference_model=self.paths.reference_model,
-                mapper_options=mapper_options,
-                # skip_geometric_verification=True,
+            proc = subprocess.Popen(
+                [
+                    "python",
+                    self.hloc_script_path,
+                    "--model_path",
+                    str(self.paths.sfm_dir),
+                    "--image_dir",
+                    str(image_dir),
+                    "--pairs_path",
+                    str(self.paths.pairs_path),
+                    "--keypoints_path",
+                    str(self.paths.features_path),
+                    "--matches_path",
+                    str(self.paths.matches_path),
+                    "--camera_mode",
+                    "auto" if camera_mode == pycolmap.CameraMode.AUTO else "single",
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
             )
+            try:
+                logging.info(
+                    "Running Hloc in subprocess (no console output until Hloc finishes)"
+                )
+                output, error = proc.communicate()
+                logging.info(output.decode())
+                logging.error(error.decode())
 
-        if self.sparse_model is not None:
-            self.sparse_model.write(self.paths.sfm_dir)
+                # subprocess writes sfm model to disk => load model in main process
+                if self.paths.sfm_dir.exists():
+                    try:
+                        self.sparse_model = pycolmap.Reconstruction(self.paths.sfm_dir)
+                    except ValueError:
+                        logging.warning(
+                            f"Could not reconstruct / read model from {self.paths.sfm_dir}."
+                        )
+                        self.sparse_model = None
+            except Exception:
+                logging.warning("Could not reconstruct model with Hloc.")
+                self.sparse_model = None
 
         gc.collect()
 

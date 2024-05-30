@@ -203,6 +203,8 @@ class DataPaths:
         self.input_dir = Path(f"{data_dir}/{mode}/{dataset}")
         self.scene_dir = output_dir / dataset / scene
         self.image_dir = self.scene_dir / "images"
+        self.dataset = dataset
+        self.scene = scene
 
         # TODO: Uncomment if reference model is desired
         # self.reference_model = self.input_dir / "smf" # There is a typo with the data (should be sfm)
