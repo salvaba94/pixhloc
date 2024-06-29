@@ -138,7 +138,7 @@ def preprocess_image_dir(
     # log paths to debug
     logging.debug(f"Rescaling {input_dir / 'images'}")
 
-    if "transp" in dataset:
+    if "transp_obj" in dataset:
         logging.debug(f"Equalizing {input_dir / 'images'}")
 
     logging.debug(f"Saving to {output_dir / 'images'}")
@@ -156,7 +156,7 @@ def preprocess_image_dir(
         if args.resize is not None:
             image = resize_image(image, args.resize)
 
-        if "transp" in dataset:
+        if "transp_obj" in dataset:
             image = equalize_image(image, args.equalize_grayscale, args.equalize_clip_limit, args.equalize_grid_size)
 
         cv2.imwrite(str(output_dir / "images" / image_fn), image)

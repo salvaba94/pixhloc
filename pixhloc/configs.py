@@ -37,6 +37,29 @@ configs = {
             },
         },
     },
+    "sift_dog": {
+        "features": {
+            "model": {"name": "dog"},
+            "options": {
+                "first_octave": -1,
+                "peak_threshold": 0.00667,  # 0.00667, # 0.01,
+            },
+            "output": "feats-sift",
+            "preprocessing": { "grayscale": True, "resize_max": 1600},
+        },
+        "matches": {
+            "output": "matches-sift-lightglue",
+            "model": {
+                "features": "sift",
+                "name": "lightglue",
+                "weights": "sift_lightglue",
+                "filter_threshold": 0.1,
+                "width_confidence": -1,
+                "depth_confidence": -1,
+                "mp": True
+            },
+        },
+    },
     "loftr": {
         "features": None,
         "matches": {
@@ -61,7 +84,7 @@ configs = {
             "output": "feats-disk",
             "model": {
                 "name": "disk",
-                "max_keypoints": 4096,
+                "max_keypoints": 5000,
             },
             "preprocessing": {
                 "grayscale": False,

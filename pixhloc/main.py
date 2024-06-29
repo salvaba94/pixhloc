@@ -96,7 +96,6 @@ def main(args):
         "matches": [c["matches"] for c in confs],
         "retrieval": extract_features.confs[args.retrieval],
         "n_retrieval": args.n_retrieval,
-        "n_retrieval_transp": args.n_retrieval_transp,
     }
     with open(str(output_dir / "config.json"), "w") as jf:
         json.dump(config, jf, indent=4)
@@ -227,7 +226,6 @@ if __name__ == "__main__":
     )
     parser.add_argument("--retrieval", type=str, default="netvlad", choices=["netvlad", "cosplace"])
     parser.add_argument("--n_retrieval", type=int, default=50, help="number of retrieval images")
-    parser.add_argument("--n_retrieval_transp", type=int, default=50, help="number of retrieval images for transparent objects")
     parser.add_argument(
         "--mode", type=str, required=True, choices=["train", "test"], help="train or test"
     )
@@ -247,8 +245,6 @@ if __name__ == "__main__":
         action="store_true",
         help="wrapper implementation of rotation matching",
     )
-    parser.add_argument("--equalize_transp", action="store_true", help="equalize transparent objects")
-    parser.add_argument("--equalize_grayscale", action="store_true", help="equalize transparent objects with grayscale")
     parser.add_argument("--cropping", action="store_true", help="use image cropping")
     parser.add_argument(
         "--max_rel_crop_size",
