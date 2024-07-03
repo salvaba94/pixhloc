@@ -14,3 +14,4 @@ Sfm pipelines for IMC 2024 challenge.
 - Pixel-Perfect-Sfm: https://github.com/cvg/pixel-perfect-sfm
 - COLMAP: https://github.com/colmap/colmap
 - Rerun: https://github.com/rerun-io/rerun
+- DINOv2 Salad: https://github.com/serizba/salad
